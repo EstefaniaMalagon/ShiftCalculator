@@ -1,8 +1,7 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// Configuración real del proyecto Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAc9Tpl_UMzN2KIqjP7B__bzEe2VZPJ32s",
   authDomain: "shiftcalculator-44abd.firebaseapp.com",
@@ -13,10 +12,9 @@ const firebaseConfig = {
   measurementId: "G-EQTQDELMCV"
 };
 
-// Inicializar Firebase
-const app = initializeApp(firebaseConfig);
+// Inicialización segura
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Servicios que usare
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 

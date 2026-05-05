@@ -1,53 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useShifts } from '../../hooks/useShifts';
 import { calculateMonthlyEarnings, formatCurrency } from '../../utils/salaryCalculator';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export default function DashboardScreen({ navigation }) {
-  const { currentUser, userProfile } = useAuth();
-  const [stats, setStats] = useState({ totalHours: 0, extraHours: 0, earnings: 0 });
-  const [recentShifts, setRecentShifts] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const { userProfile } = useAuth();
+  const { shifts, loading } = useShifts();
 
   const monthName = format(new Date(), 'MMMM yyyy', { locale: es });
 
-  async function loadData() {
-    if (!currentUser) return;
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    
-    const q = query(
-      collection(db, 'shifts'),
-      where('userId', '==', currentUser.uid),
-      where('date', '>=', startOfMonth),
-      orderBy('date', 'desc')
-    );
-    
-    const snapshot = await getDocs(q);
-    const shifts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    
-    setRecentShifts(shifts.slice(0, 3));
+  // CALCULAMOS LAS ESTADÍSTICAS DEL MES ACTUAL
+  const stats = useMemo(() => {
+    const hoy = new Date();
+    const mesActual = hoy.getMonth();
+    const anioActual = hoy.getFullYear();
+
+    // Filtramos comparando mes y año directamente para evitar errores de desfase
+    const currentMonthShifts = shifts.filter(s => {
+      const shiftDate = new Date(s.date);
+      return shiftDate.getMonth() === mesActual && 
+             shiftDate.getFullYear() === anioActual;
+    });
     
     const hourlyRate = userProfile?.hourlyRate || 6000;
-    const monthly = calculateMonthlyEarnings(shifts, hourlyRate);
-    setStats(monthly);
-  }
+    return calculateMonthlyEarnings(currentMonthShifts, hourlyRate);
+  }, [shifts, userProfile]);
 
-  useEffect(() => { loadData(); }, [currentUser]);
-
-  async function onRefresh() {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }
+  // Mostramos los 3 más recientes sin importar el mes para dar feedback visual
+  const recentShifts = useMemo(() => shifts.slice(0, 3), [shifts]);
 
   const quickActions = [
     { icon: '⏰', label: 'Registrar\nTurno', screen: 'RegisterShift', color: '#00D4FF' },
@@ -60,7 +47,7 @@ export default function DashboardScreen({ navigation }) {
     <LinearGradient colors={['#0A0E1A', '#0D1B2A']} style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D4FF" />}
+        refreshControl={<RefreshControl refreshing={loading} tintColor="#00D4FF" />}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -122,10 +109,10 @@ export default function DashboardScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {recentShifts.length === 0 ? (
+        {recentShifts.length === 0 && !loading ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyText}>No hay turnos este mes</Text>
+            <Text style={styles.emptyText}>No hay turnos registrados</Text>
             <TouchableOpacity
               style={styles.emptyBtn}
               onPress={() => navigation.navigate('RegisterShift')}
@@ -143,87 +130,156 @@ export default function DashboardScreen({ navigation }) {
   );
 }
 
-function ShiftItem({ shift }) {
-  const typeColors = {
-    normal: '#10B981', nocturno: '#8B5CF6',
-    dominical: '#F59E0B', festivo: '#EF4444',
+const ShiftItem = ({ shift }) => {
+  const typeStyles = {
+    normal: { bg: '#10B98120', text: '#10B981', label: 'Diurno' },
+    nocturno: { bg: '#8B5CF620', text: '#8B5CF6', label: 'Nocturno' },
+    dominical: { bg: '#F59E0B20', text: '#F59E0B', label: 'Dominical' },
+    festivo: { bg: '#EF444420', text: '#EF4444', label: 'Festivo' },
   };
-  const typeLabels = {
-    normal: 'Diurno', nocturno: 'Nocturno',
-    dominical: 'Dominical', festivo: 'Festivo',
-  };
+
+  const style = typeStyles[shift.type] || typeStyles.normal;
 
   return (
     <View style={styles.shiftCard}>
-      <View style={[styles.shiftDot, { backgroundColor: typeColors[shift.type] || '#00D4FF' }]} />
       <View style={styles.shiftInfo}>
-        <Text style={styles.shiftDate}>{format(new Date(shift.date), 'dd MMM', { locale: es })}</Text>
-        <Text style={styles.shiftType}>{typeLabels[shift.type] || shift.type}</Text>
+        <Text style={styles.shiftDate}>
+          {format(new Date(shift.date), "EEEE d 'de' MMMM", { locale: es })}
+        </Text>
+        <Text style={styles.shiftHours}>
+          {format(new Date(shift.startTime), 'HH:mm')} - {format(new Date(shift.endTime), 'HH:mm')}
+        </Text>
       </View>
-      <View style={styles.shiftRight}>
-        <Text style={styles.shiftHours}>{shift.totalHours}h</Text>
+      <View style={styles.shiftBadge}>
+        <View style={[styles.typeTag, { backgroundColor: style.bg }]}>
+          <Text style={[styles.typeText, { color: style.text }]}>{style.label}</Text>
+        </View>
         <Text style={styles.shiftEarnings}>{formatCurrency(shift.earnings)}</Text>
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 24, paddingTop: 60, paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 25,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  greeting: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  monthLabel: { fontSize: 14, color: '#9CA3AF', marginTop: 2, textTransform: 'capitalize' },
-  configBtn: { padding: 8 },
-  configIcon: { fontSize: 24 },
-  statsGrid: { paddingHorizontal: 24, gap: 12, marginBottom: 8 },
-  statRow: { flexDirection: 'row', gap: 12 },
+  greeting: { fontSize: 16, color: '#94A3B8', marginBottom: 4 },
+  monthLabel: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
+  configBtn: {
+    width: 45,
+    height: 45,
+    borderRadius: 12,
+    backgroundColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  configIcon: { fontSize: 20 },
+  statsGrid: { paddingHorizontal: 20, marginBottom: 30 },
   statCard: {
-    flex: 1, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#1F2937',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#FFFFFF10',
+    flex: 1,
   },
-  statCardWide: { marginBottom: 0 },
-  statIcon: { fontSize: 20, marginBottom: 4 },
-  statValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  statLabel: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', paddingHorizontal: 24, marginTop: 24, marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 24 },
-  seeAll: { color: '#00D4FF', fontSize: 14 },
-  actionsGrid: { flexDirection: 'row', paddingHorizontal: 24, gap: 12 },
-  actionBtn: { flex: 1, alignItems: 'center' },
+  statCardWide: { marginBottom: 12 },
+  statRow: { flexDirection: 'row', gap: 12 },
+  statLabel: { color: '#94A3B8', fontSize: 13, marginBottom: 4 },
+  statValue: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
+  statIcon: { fontSize: 20, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 15,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 15,
+    marginBottom: 25,
+  },
+  actionBtn: {
+    width: '25%',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
   actionIcon: {
-    width: 56, height: 56, borderRadius: 16,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, marginBottom: 6,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    marginBottom: 8,
   },
   actionEmoji: { fontSize: 24 },
-  actionLabel: { fontSize: 11, color: '#9CA3AF', textAlign: 'center' },
-  emptyCard: {
-    margin: 24, borderRadius: 16,
-    backgroundColor: '#111827', padding: 32,
-    alignItems: 'center', borderWidth: 1, borderColor: '#1F2937',
+  actionLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 14,
   },
-  emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#6B7280', fontSize: 15, marginBottom: 16 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: 20,
+    marginBottom: 10,
+  },
+  seeAll: { color: '#00D4FF', fontSize: 14 },
+  shiftCard: {
+    backgroundColor: '#1E293B60',
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 16,
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFFFFF05',
+  },
+  shiftDate: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textTransform: 'capitalize' },
+  shiftHours: { color: '#64748B', fontSize: 13, marginTop: 2 },
+  shiftBadge: { alignItems: 'flex-end' },
+  typeTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  typeText: { fontSize: 11, fontWeight: '700' },
+  shiftEarnings: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
+  emptyCard: {
+    marginHorizontal: 20,
+    padding: 40,
+    backgroundColor: '#1E293B40',
+    borderRadius: 24,
+    alignItems: 'center',
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  emptyIcon: { fontSize: 40, marginBottom: 10 },
+  emptyText: { color: '#64748B', fontSize: 15, marginBottom: 20 },
   emptyBtn: {
     backgroundColor: '#00D4FF20',
-    borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10,
-    borderWidth: 1, borderColor: '#00D4FF40',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#00D4FF40',
   },
-  emptyBtnText: { color: '#00D4FF', fontWeight: '700' },
-  shiftCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#111827', marginHorizontal: 24,
-    marginBottom: 8, borderRadius: 14, padding: 16,
-    borderWidth: 1, borderColor: '#1F2937',
-  },
-  shiftDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
-  shiftInfo: { flex: 1 },
-  shiftDate: { color: '#FFFFFF', fontWeight: '600', fontSize: 15 },
-  shiftType: { color: '#9CA3AF', fontSize: 13 },
-  shiftRight: { alignItems: 'flex-end' },
-  shiftHours: { color: '#9CA3AF', fontSize: 13 },
-  shiftEarnings: { color: '#10B981', fontWeight: '700', fontSize: 15 },
+  emptyBtnText: { color: '#00D4FF', fontWeight: '600' },
 });
