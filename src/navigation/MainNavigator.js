@@ -6,6 +6,7 @@ import ShiftHistoryScreen from '../screens/main/ShiftHistoryScreen';
 import SalaryCompareScreen from '../screens/main/SalaryCompareScreen';
 import ReportScreen from '../screens/main/ReportScreen';
 import ConfigScreen from '../screens/main/ConfigScreen';
+import ChatbotScreen from '../screens/main/ChatbotScreen';
 
 const Stack = createStackNavigator();
 
@@ -18,6 +19,7 @@ export default function MainNavigator() {
       <Stack.Screen name="Compare" component={SalaryCompareScreen} />
       <Stack.Screen name="Report" component={ReportScreen} />
       <Stack.Screen name="Config" component={ConfigScreen} />
+      <Stack.Screen name="Chatbot" component={ChatbotScreen} />
     </Stack.Navigator>
   );
 }

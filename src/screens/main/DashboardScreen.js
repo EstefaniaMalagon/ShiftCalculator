@@ -51,13 +51,38 @@ export default function DashboardScreen({ navigation }) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hola, {userProfile?.name?.split(' ')[0] || 'Usuario'} 👋</Text>
-            <Text style={styles.monthLabel}>{monthName}</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Config')} style={styles.configBtn}>
+        <View>
+          <Text style={styles.greeting}>
+            Hola, {userProfile?.name?.split(' ')[0] || 'Usuario'} 👋
+          </Text>
+          <Text style={styles.monthLabel}>{monthName}</Text>
+        </View>
+
+        {/* 👇 Contenedor de botones */}
+          <View style={styles.headerRight}>
+    
+        {/* Botón ShiftBot */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Chatbot')}
+            style={styles.botBtn}
+        >
+        <LinearGradient
+          colors={['#00D4FF', '#0099CC']}
+          style={styles.botBtnInner}
+        >
+          <Text style={styles.botIcon}>🤖</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Botón Config */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Config')}
+            style={styles.configBtn}
+          >
             <Text style={styles.configIcon}>⚙️</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
+
+          </View>
         </View>
 
         {/* Stats Cards */}
@@ -282,4 +307,29 @@ const styles = StyleSheet.create({
     borderColor: '#00D4FF40',
   },
   emptyBtnText: { color: '#00D4FF', fontWeight: '600' },
+  headerRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  },
+
+  botBtn: {
+    shadowColor: '#00D4FF',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+
+  botBtnInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  botIcon: {
+    fontSize: 20,
+    color: '#fff',
+  },
 });
