@@ -23,21 +23,23 @@ export function useShifts() {
 
     setLoading(true);
     
-    // Consulta base: Todos los turnos del usuario actual
+    // Consulta base: Solo filtramos por usuario para evitar requerir índices compuestos
     const q = query(
       collection(db, 'shifts'),
-      where('userId', '==', currentUser.uid),
-      orderBy('date', 'desc')
+      where('userId', '==', currentUser.uid)
     );
 
     // El Listener 'onSnapshot' es el que hace la magia de actualizar sin recargar
     const unsubscribe = onSnapshot(q, 
       (snap) => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Ordenamos manualmente por fecha descendente en el cliente
+        data.sort((a, b) => new Date(b.date) - new Date(a.date));
         setShifts(data);
         setLoading(false);
       }, 
       (err) => {
+        console.error("Error en onSnapshot useShifts:", err);
         setError(err.message);
         setLoading(false);
       }

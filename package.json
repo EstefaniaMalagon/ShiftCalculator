@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -24,7 +25,7 @@
     "express": "^5.2.1",
     "firebase": "^12.12.1",
     "node-fetch": "^3.3.2",
-    "react": "^19.1.0",
+    "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "^0.81.5",
     "react-native-gesture-handler": "~2.28.0",
@@ -33,9 +34,16 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.0"
+    "@babel/core": "^7.25.0",
+    "@testing-library/react-native": "^13.3.3",
+    "jest": "^29.7.0",
+    "jest-expo": "^56.0.4",
+    "react-test-renderer": "^19.1.0"
   },
   "private": true,
+  "jest": {
+    "preset": "jest-expo"
+  },
   "description": "Aplicación móvil multiplataforma que permite a los trabajadores registrar su jornada laboral y calcular automáticamente el valor estimado de su salario, incluyendo horas extras y recargos legales según la ley.",
   "repository": {
     "type": "git",

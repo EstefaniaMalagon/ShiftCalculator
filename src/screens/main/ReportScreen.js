@@ -66,25 +66,32 @@ export default function ReportScreen({ navigation }) {
       setLoading(true);
       const sixMonthsAgo = subMonths(new Date(), 6).toISOString();
 
-      // Load shifts
+      // Simplificamos la consulta para evitar requerir índices
       const shiftsQ = query(
         collection(db, 'shifts'),
-        where('userId', '==', currentUser.uid),
-        where('date', '>=', sixMonthsAgo),
-        orderBy('date', 'desc')
+        where('userId', '==', currentUser.uid)
       );
       const shiftsSnap = await getDocs(shiftsQ);
-      const allShifts = shiftsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      // Filtramos y ordenamos en el cliente
+      const allShifts = shiftsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(s => s.date >= sixMonthsAgo)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
       setShifts(allShifts);
 
-      // Load salary comparisons
+      // Lo mismo para el historial de salarios
       const salaryQ = query(
         collection(db, 'salaries'),
-        where('userId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', currentUser.uid)
       );
       const salarySnap = await getDocs(salaryQ);
-      setSalaryHistory(salarySnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const allSalaries = salarySnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      setSalaryHistory(allSalaries);
 
       // Process monthly data for bar chart
       const months = getLast6Months();
